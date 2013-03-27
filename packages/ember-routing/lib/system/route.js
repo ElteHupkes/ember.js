@@ -158,8 +158,8 @@ Ember.Route = Ember.Object.extend({
 
     @method deserialize
   */
-  deserialize: function(params) {
-    var model = this.model(params);
+  deserialize: function(params, queryParams) {
+    var model = this.model(params, queryParams);
     return this.currentModel = model;
   },
 
@@ -193,8 +193,9 @@ Ember.Route = Ember.Object.extend({
 
     @method model
     @param {Object} params the parameters extracted from the URL
+    @param {Object} queryParams The parameters extracted from the URL query string (?a=b)
   */
-  model: function(params) {
+  model: function(params, queryParams) {
     var match, name, sawParams, value;
 
     for (var prop in params) {

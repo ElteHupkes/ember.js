@@ -68,14 +68,15 @@ define("router",
         @return {Array} an Array of `[handler, parameter]` tuples
       */
       handleURL: function(url) {
-        var results = this.recognizer.recognize(url),
-            objects = [];
+        var parts = url.split('?'),
+            queryParams = (parts.length > 1) ? deserializeQueryString(parts[1]) : {},
+            results = this.recognizer.recognize(parts[0]);
 
         if (!results) {
-          throw new Error("No route matched the URL '" + url + "'");
+          throw new Error("No route matched the URL '" + parts[0] + "'");
         }
 
-        collectObjects(this, results, 0, []);
+        collectObjects(this, results, queryParams, 0, []);
       },
 
       /**
@@ -109,6 +110,19 @@ define("router",
       transitionTo: function(name) {
         var args = Array.prototype.slice.call(arguments, 1);
         doTransition(this, name, this.updateURL, args);
+      },
+
+      /**
+       * Transition into the specified named route, appending query string
+       * parameters. The last argument of this method should be a plain JS-object
+       * containing key=>value pairs to be added to the query string.
+       *
+       * @param {String} name The name of the route
+       */
+      transitionToWithQueryString: function(name) {
+        var args = Array.prototype.slice.call(arguments, 1, -1),
+            qs = arguments[arguments.length - 1];
+        doTransition(this, name, this.updateURL, args, qs);
       },
 
       /**
@@ -159,7 +173,7 @@ define("router",
 
         Used internally by `generate` and `transitionTo`.
       */
-      _paramsForHandler: function(handlerName, objects, doUpdate) {
+      _paramsForHandler: function(handlerName, objects, queryParams, doUpdate) {
         var handlers = this.recognizer.handlersFor(handlerName),
             params = {},
             toSetup = [],
@@ -178,6 +192,9 @@ define("router",
         if (objectsToMatch > 0) {
           throw "More objects were passed than dynamic segments";
         }
+
+        // Make sure queryParams is an object
+        queryParams = queryParams || {};
 
         // Connect the objects to the routes
         for (i=0, len=handlers.length; i<len; i++) {
@@ -207,7 +224,7 @@ define("router",
             // or if we never had a context
             if (i > startIdx || !handler.hasOwnProperty('context')) {
               if (handler.deserialize) {
-                object = handler.deserialize({});
+                object = handler.deserialize({}, queryParams);
                 objectChanged = true;
               }
             // Otherwise use existing context
@@ -338,11 +355,17 @@ define("router",
     /**
       @private
     */
-    function doTransition(router, name, method, args) {
-      var output = router._paramsForHandler(name, args, true);
+    function doTransition(router, name, method, args, queryParams) {
+      var output = router._paramsForHandler(name, args, queryParams, true);
       var params = output.params, toSetup = output.toSetup;
 
-      var url = router.recognizer.generate(name, params);
+      var url = router.recognizer.generate(name, params),
+          qs = serializeQueryString(queryParams || {});
+
+      if (qs) {
+        url += '?'+qs;
+      }
+
       method.call(router, url);
 
       setupContexts(router, toSetup);
@@ -365,7 +388,7 @@ define("router",
       resolved. It will use the resolved value as the context of
       `HandlerInfo`.
     */
-    function collectObjects(router, results, index, objects) {
+    function collectObjects(router, results, queryParams, index, objects) {
       if (results.length === index) {
         loaded(router);
         setupContexts(router, objects);
@@ -374,7 +397,7 @@ define("router",
 
       var result = results[index];
       var handler = router.getHandler(result.handler);
-      var object = handler.deserialize && handler.deserialize(result.params);
+      var object = handler.deserialize && handler.deserialize(result.params, queryParams);
 
       if (object && typeof object.then === 'function') {
         loading(router);
@@ -397,7 +420,7 @@ define("router",
           handler: result.handler,
           isDynamic: result.isDynamic
         }]);
-        collectObjects(router, results, index + 1, updatedObjects);
+        collectObjects(router, results, queryParams, index + 1, updatedObjects);
       }
     }
 
@@ -615,5 +638,37 @@ define("router",
       handler.context = context;
       if (handler.contextDidChange) { handler.contextDidChange(); }
     }
+
+    /**
+     * Parses a given query string into an object.
+     * @param {String} qs
+     * @return {Object} The key=value pairs as contained in the query string.
+     */
+    function deserializeQueryString(qs) {
+      var obj = {}, parts;
+      Ember.ArrayPolyfills.forEach.call(qs.split('&'), function(kv) {
+        if (!kv) {
+          // Ignore empty pairs
+          return true;
+        }
+
+        parts = kv.split('=');
+        // Set to empty string if the value is absent
+        // TODO Check if this should be set to true instead to use as a flag
+        obj[parts[0]] = (parts.length > 1) ? parts[1] : '';
+      });
+      return obj;
+    }
+
+    /**
+     * Serializes an object to a key=value query string.
+     * Uses jQuery.param.
+     * @param {Object} params
+     * @returns {String}
+     */
+    function serializeQueryString(params) {
+      return Ember.$.param(params);
+    }
+
     return Router;
   });
