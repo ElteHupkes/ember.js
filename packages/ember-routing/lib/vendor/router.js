@@ -119,7 +119,7 @@ define("router",
        *
        * @param {String} name The name of the route
        */
-      transitionToWithQueryString: function(name) {
+      transitionToWithQuery: function(name) {
         var args = Array.prototype.slice.call(arguments, 1, -1),
             qs = arguments[arguments.length - 1];
         doTransition(this, name, this.updateURL, args, qs);
@@ -360,7 +360,8 @@ define("router",
       var params = output.params, toSetup = output.toSetup;
 
       var url = router.recognizer.generate(name, params),
-          qs = serializeQueryString(queryParams || {});
+          // Serialize the query parameters using $.param.
+          qs = Ember.$.param(queryParams || {});
 
       if (qs) {
         url += '?'+qs;
@@ -397,7 +398,8 @@ define("router",
 
       var result = results[index];
       var handler = router.getHandler(result.handler);
-      var object = handler.deserialize && handler.deserialize(result.params, queryParams);
+      var params = handler.deserializeQuery && handler.deserializeQuery(queryParams);
+      var object = handler.deserialize && handler.deserialize(result.params, params);
 
       if (object && typeof object.then === 'function') {
         loading(router);
@@ -658,16 +660,6 @@ define("router",
         obj[parts[0]] = (parts.length > 1) ? parts[1] : '';
       });
       return obj;
-    }
-
-    /**
-     * Serializes an object to a key=value query string.
-     * Uses jQuery.param.
-     * @param {Object} params
-     * @returns {String}
-     */
-    function serializeQueryString(params) {
-      return Ember.$.param(params);
     }
 
     return Router;

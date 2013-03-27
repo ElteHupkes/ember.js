@@ -164,6 +164,17 @@ Ember.Route = Ember.Object.extend({
   },
 
   /**
+   * The hook called by `router.js` to extract the query string
+   * parameters for this controller. This can be used to extract
+   * only the parameters required for this controller.
+   * @param {Object} query
+   * @returns {Object}
+   */
+  deserializeQuery: function(query) {
+    return this.queryParameters = query;
+  },
+
+  /**
     @private
 
     Called when the context is changed by router.js.

@@ -93,6 +93,11 @@ Ember.Router = Ember.Object.extend({
     doTransition(this, 'transitionTo', args);
   },
 
+  transitionToWithQuery: function(name) {
+    var args = [].slice.call(arguments);
+    doTransition(this, 'transitionToWithQuery', args);
+  },
+
   replaceWith: function() {
     var args = [].slice.call(arguments);
     doTransition(this, 'replaceWith', args);
