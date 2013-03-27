@@ -355,21 +355,22 @@ define("router",
     /**
       @private
     */
-    function doTransition(router, name, method, args, queryParams) {
-      var output = router._paramsForHandler(name, args, queryParams, true);
+    function doTransition(router, name, method, args, query) {
+      var output = router._paramsForHandler(name, args, query = query || {}, true);
       var params = output.params, toSetup = output.toSetup;
 
       var url = router.recognizer.generate(name, params),
           // Serialize the query parameters using $.param.
-          qs = Ember.$.param(queryParams || {});
+          qs = Ember.$.param(query);
 
+      // Append the query string if its not empty
       if (qs) {
         url += '?'+qs;
       }
 
       method.call(router, url);
 
-      setupContexts(router, toSetup);
+      setupContexts(router, toSetup, query);
     }
 
     /**
@@ -389,17 +390,16 @@ define("router",
       resolved. It will use the resolved value as the context of
       `HandlerInfo`.
     */
-    function collectObjects(router, results, queryParams, index, objects) {
+    function collectObjects(router, results, query, index, objects) {
       if (results.length === index) {
         loaded(router);
-        setupContexts(router, objects);
+        setupContexts(router, objects, query);
         return;
       }
 
       var result = results[index];
       var handler = router.getHandler(result.handler);
-      var params = handler.deserializeQuery && handler.deserializeQuery(queryParams);
-      var object = handler.deserialize && handler.deserialize(result.params, params);
+      var object = handler.deserialize && handler.deserialize(result.params, query);
 
       if (object && typeof object.then === 'function') {
         loading(router);
@@ -422,7 +422,7 @@ define("router",
           handler: result.handler,
           isDynamic: result.isDynamic
         }]);
-        collectObjects(router, results, queryParams, index + 1, updatedObjects);
+        collectObjects(router, results, query, index + 1, updatedObjects);
       }
     }
 
@@ -465,8 +465,9 @@ define("router",
 
       @param {Router} router
       @param {Array[UnresolvedHandlerInfo]} handlerInfos
+      @param {Object} query
     */
-    function setupContexts(router, handlerInfos) {
+    function setupContexts(router, handlerInfos, query) {
       resolveHandlers(router, handlerInfos);
 
       var partition =
@@ -481,7 +482,7 @@ define("router",
 
       eachHandler(partition.updatedContext, function(handler, context) {
         setContext(handler, context);
-        if (handler.setup) { handler.setup(context); }
+        if (handler.setup) { handler.setup(context, query); }
       });
 
       var aborted = false;
@@ -490,7 +491,7 @@ define("router",
         if (handler.enter) { handler.enter(); }
         setContext(handler, context);
         if (handler.setup) {
-          if (false === handler.setup(context)) {
+          if (false === handler.setup(context, query)) {
             aborted = true;
           }
         }

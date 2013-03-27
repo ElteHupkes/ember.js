@@ -85,6 +85,20 @@ Ember.Route = Ember.Object.extend({
   },
 
   /**
+    Transition into another route similar to the transitionTo, using
+    an additional object with query string parameters.
+
+    @method transitionToWithQuery
+    @param {String} name the name of the route
+    @param {...Object} models The contexts for the route
+    @param {Object} query An object containing query string parameters
+   */
+  transitionToWithQuery: function() {
+    if (this._checkingRedirect) { this.redirected = true; }
+    this.router.transitionToWithQuery.apply(this.router, arguments);
+  },
+
+  /**
     Transition into another route while replacing the current URL if
     possible. Identical to `transitionTo` in all other respects.
 
@@ -108,7 +122,7 @@ Ember.Route = Ember.Object.extend({
 
     @method setup
   */
-  setup: function(context) {
+  setup: function(context, query) {
     this.redirected = false;
     this._checkingRedirect = true;
 
@@ -128,7 +142,7 @@ Ember.Route = Ember.Object.extend({
       Ember.deprecate("Ember.Route.setupControllers is deprecated. Please use Ember.Route.setupController(controller, model) instead.");
       this.setupControllers(controller, context);
     } else {
-      this.setupController(controller, context);
+      this.setupController(controller, context, query);
     }
 
     if (this.renderTemplates) {
@@ -161,17 +175,6 @@ Ember.Route = Ember.Object.extend({
   deserialize: function(params, queryParams) {
     var model = this.model(params, queryParams);
     return this.currentModel = model;
-  },
-
-  /**
-   * The hook called by `router.js` to extract the query string
-   * parameters for this controller. This can be used to extract
-   * only the parameters required for this controller.
-   * @param {Object} query
-   * @returns {Object}
-   */
-  deserializeQuery: function(query) {
-    return this.queryParameters = query;
   },
 
   /**

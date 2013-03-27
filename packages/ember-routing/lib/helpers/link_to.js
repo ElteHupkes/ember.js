@@ -107,12 +107,12 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
       var router = this.get('router'),
           url = router.generate.apply(router, args(this, router));
 
-      if (this.get('queryParameters')) {
+      if (this.get('query')) {
         url +=  '?'+ Ember.$.param(this.get('queryParameters'));
       }
 
       return url;
-    }).property('queryParameters')
+    }).property('query')
   });
 
   LinkView.toString = function() { return "LinkView"; };
@@ -131,8 +131,8 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
 
     // This part allows you to pass "somethingQuery" options to the
     // link helper, which will then be converted to query parameters
-    // in the link. A queryParametersBinding can also be supplied to
-    // the link helper.
+    // in the link. A queryBinding can also be supplied to
+    // the link helper to dynamically generate the query object.
     var query = {},
       isQueryParameter = /(.+)Query$/,
       option, match, hasQuery = false;
@@ -144,7 +144,7 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
     }
 
     if (hasQuery) {
-      options.hash.queryParameters = query;
+      options.hash.query = query;
     }
 
     hash.namedRoute = name;

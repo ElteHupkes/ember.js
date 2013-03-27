@@ -13,6 +13,13 @@ Ember.ControllerMixin.reopen({
     return method.apply(target, arguments);
   },
 
+  transitionToRouteWithQuery: function() {
+    // target may be either another controller or a router
+    var target = get(this, 'target'),
+      method = target.transitionToRouteWithQuery || target.transitionToWithQuery;
+    return method.apply(target, arguments);
+  },
+
   transitionTo: function() {
     Ember.deprecate("transitionTo is deprecated. Please use transitionToRoute.");
     return this.transitionToRoute.apply(this, arguments);
