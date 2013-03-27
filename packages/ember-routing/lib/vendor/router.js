@@ -69,14 +69,14 @@ define("router",
       */
       handleURL: function(url) {
         var parts = url.split('?'),
-            queryParams = (parts.length > 1) ? deserializeQueryString(parts[1]) : {},
+            query = (parts.length > 1) ? deserializeQueryString(parts[1]) : {},
             results = this.recognizer.recognize(parts[0]);
 
         if (!results) {
           throw new Error("No route matched the URL '" + parts[0] + "'");
         }
 
-        collectObjects(this, results, queryParams, 0, []);
+        collectObjects(this, results, query, 0, []);
       },
 
       /**

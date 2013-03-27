@@ -92,12 +92,12 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
       event.preventDefault();
       if (this.bubbles === false) { event.stopPropagation(); }
 
-      var router = this.get('router'), params = this.get('queryParameters');
+      var router = this.get('router'), query = this.get('query');
 
       if (this.get('replace')) {
         router.replaceWith.apply(router, args(this, router));
-      } else if (params) {
-        router.transitionToWithQuery.apply(router, args(this, router).concat(params));
+      } else if (query) {
+        router.transitionToWithQuery.apply(router, args(this, router).concat(query));
       } else {
         router.transitionTo.apply(router, args(this, router));
       }
@@ -108,7 +108,7 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
           url = router.generate.apply(router, args(this, router));
 
       if (this.get('query')) {
-        url +=  '?'+ Ember.$.param(this.get('queryParameters'));
+        url +=  '?'+ Ember.$.param(this.get('query'));
       }
 
       return url;
