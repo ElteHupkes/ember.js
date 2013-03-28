@@ -35,10 +35,13 @@ define("route-recognizer",
           char = string.charAt(i);
           callback({ validChars: char });
         }
+
+        // Add an extra character to allow a query string
+        callback({ invalidChars: "/", repeat: true });
       },
 
       regex: function() {
-        return this.string.replace(escapeRegex, '\\$1');
+        return this.string.replace(escapeRegex, '\\$1')+'(\\?[^/]+)?';
       },
 
       generate: function() {
