@@ -172,9 +172,21 @@ Ember.Route = Ember.Object.extend({
 
     @method deserialize
   */
-  deserialize: function(params, queryParams) {
-    var model = this.model(params, queryParams);
+  deserialize: function(params, query) {
+    var model = this.model(params, query);
+    this.currentQuery = query;
     return this.currentModel = model;
+  },
+
+  /**
+   * Extracts the query parameters relevant for this
+   * route from the query string.
+   *
+   * @param {Object} query
+   * @returns {null|Object}
+   */
+  deserializeQuery: function(query) {
+    return query;
   },
 
   /**

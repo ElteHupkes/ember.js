@@ -121,8 +121,8 @@ define("router",
        */
       transitionToWithQuery: function(name) {
         var args = Array.prototype.slice.call(arguments, 1, -1),
-            qs = arguments[arguments.length - 1];
-        doTransition(this, name, this.updateURL, args, qs);
+            query = arguments[arguments.length - 1];
+        doTransition(this, name, this.updateURL, args, query);
       },
 
       /**
@@ -173,13 +173,15 @@ define("router",
 
         Used internally by `generate` and `transitionTo`.
       */
-      _paramsForHandler: function(handlerName, objects, queryParams, doUpdate) {
+      _paramsForHandler: function(handlerName, objects, query, doUpdate) {
         var handlers = this.recognizer.handlersFor(handlerName),
             params = {},
+            mergedQuery = {},
             toSetup = [],
             startIdx = handlers.length,
             objectsToMatch = objects.length,
-            object, objectChanged, handlerObj, handler, names, i, len;
+            object, objectChanged, handlerObj, handler, names, i, len,
+            handlerQuery, queryChanged, handlerParams;
 
         // Find out which handler to start matching at
         for (i=handlers.length-1; i>=0 && objectsToMatch>0; i--) {
@@ -193,8 +195,8 @@ define("router",
           throw "More objects were passed than dynamic segments";
         }
 
-        // Make sure queryParams is an object
-        queryParams = queryParams || {};
+        // Make sure query is an object
+        query = query || {};
 
         // Connect the objects to the routes
         for (i=0, len=handlers.length; i<len; i++) {
@@ -202,6 +204,10 @@ define("router",
           handler = this.getHandler(handlerObj.handler);
           names = handlerObj.names;
           objectChanged = false;
+
+          handlerQuery = handler.deserializeQuery && handler.deserializeQuery(query);
+          merge(mergedQuery, handlerQuery);
+          queryChanged = !queriesMatch(handlerQuery, handler.currentQuery);
 
           // If it's a dynamic segment
           if (names.length) {
@@ -218,13 +224,14 @@ define("router",
             if (handler.serialize) {
               merge(params, handler.serialize(object, names));
             }
+
           // If it's not a dynamic segment and we're updating
           } else if (doUpdate) {
             // If we've passed the match point we need to deserialize again
             // or if we never had a context
             if (i > startIdx || !handler.hasOwnProperty('context')) {
               if (handler.deserialize) {
-                object = handler.deserialize({}, queryParams);
+                object = handler.deserialize({}, handlerQuery);
                 objectChanged = true;
               }
             // Otherwise use existing context
@@ -248,7 +255,7 @@ define("router",
           });
         }
 
-        return { params: params, toSetup: toSetup };
+        return { params: params, toSetup: toSetup, query: mergedQuery };
       },
 
       isActive: function(handlerName) {
@@ -361,12 +368,10 @@ define("router",
 
       var url = router.recognizer.generate(name, params),
           // Serialize the query parameters using $.param.
-          qs = Ember.$.param(query);
+          qs = Ember.$.param(output.query);
 
-      // Append the query string if its not empty
-      if (qs) {
-        url += '?'+qs;
-      }
+      // Append the query string
+      if (qs) { url += '?'+qs; }
 
       method.call(router, url);
 
@@ -661,6 +666,25 @@ define("router",
         obj[parts[0]] = (parts.length > 1) ? parts[1] : '';
       });
       return obj;
+    }
+
+    /**
+     * Takes to query objects and returns whether they're the same.
+     * Both query objects need to be plain objects.
+     * TODO This could probably be made more efficient
+     * @param {Object} a
+     * @param {Object} b
+     */
+    function queriesMatch(a, b) {
+      var k;
+      if (!a || !b) return false;
+      for (k in a) {
+        if (a[k] != b[k]) { return false; }
+      }
+      for (k in b) {
+        if (a[k] != b[k]) return false;
+      }
+      return true;
     }
 
     return Router;
