@@ -207,12 +207,12 @@ Ember.Route = Ember.Object.extend({
 
     @method model
     @param {Object} params the parameters extracted from the URL
-    @param {Object} queryParams The parameters extracted from the URL query string (?a=b)
+    @param {Object} query The parameters extracted from the URL query string (?a=b)
   */
-  model: function(params, queryParams) {
-    var match, name, sawParams, value;
+  model: function(params, query) {
+    var match, name, sawParams, value, prop;
 
-    for (var prop in params) {
+    for (prop in params) {
       if (match = prop.match(/^(.*)_id$/)) {
         name = match[1];
         value = params[prop];
