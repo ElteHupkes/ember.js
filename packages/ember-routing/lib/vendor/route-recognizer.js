@@ -35,13 +35,10 @@ define("route-recognizer",
           char = string.charAt(i);
           callback({ validChars: char });
         }
-
-        // Add an extra character to allow a query string
-        callback({ invalidChars: "/", repeat: true });
       },
 
       regex: function() {
-        return this.string.replace(escapeRegex, '\\$1')+'(\\?[^/]+)?';
+        return this.string.replace(escapeRegex, '\\$1');
       },
 
       generate: function() {
@@ -253,9 +250,26 @@ define("route-recognizer",
       return nextStates;
     }
 
+    /**
+     * Parses a semicolon-separated query string into a key: value
+     * object. Keys without values are interpreted as boolean flags
+     * (i.e. their value will be a boolean "true").
+     * @param {String} queryString
+     * @returns {Object}
+     */
+    function parseQueryString(queryString) {
+      var pairs = queryString.split(';'), i, l, pair, query = {};
+      for (i = 0, l = pairs.length; i < l; i++) {
+        pair = pairs[i].split("=");
+        query[pair[0]] = pair.length > 1 ? pair[1] : true;
+      }
+      return query;
+    }
+
     function findHandler(state, path) {
       var handlers = state.handlers, regex = state.regex;
       var captures = path.match(regex), currentCapture = 1;
+      var queryString, query;
       var result = [];
 
       for (var i=0, l=handlers.length; i<l; i++) {
@@ -265,7 +279,17 @@ define("route-recognizer",
           params[names[j]] = captures[currentCapture++];
         }
 
-        result.push({ handler: handler.handler, params: params, isDynamic: !!names.length });
+        // The application handler doesn't have a query string capture,
+        // so skip it (it's always the first handler)
+        if (i > 0) {
+          queryString = captures[currentCapture++];
+          query = queryString ? parseQueryString(queryString) : {};
+        } else {
+          query = {};
+        }
+
+        result.push({ handler: handler.handler, params: params,
+          isDynamic: !!names.length, query: query });
       }
 
       return result;
@@ -329,7 +353,7 @@ define("route-recognizer",
         }
 
         currentState.handlers = handlers;
-        currentState.regex = new RegExp(regex + "$");
+        currentState.regex = new RegExp(regex + "(?:;(.+))?$");
         currentState.types = types;
 
         if (name = options && options.as) {
@@ -376,7 +400,7 @@ define("route-recognizer",
       },
 
       recognize: function(path) {
-        var states = [ this.rootState ], i, l;
+        var states = [ this.rootState ], i, l, inQuery, ch;
 
         // DEBUG GROUP path
 
@@ -389,7 +413,20 @@ define("route-recognizer",
         }
 
         for (i=0, l=path.length; i<l; i++) {
-          states = recognizeChar(states, path.charAt(i));
+          ch = path.charAt(i);
+          if (inQuery) {
+            if (ch == '/') {
+              // No longer in a query string
+              inQuery = false;
+            } else {
+              // Ignore this character
+              continue;
+            }
+          } else if (ch == ';') {
+            inQuery = true;
+            continue;
+          }
+          states = recognizeChar(states, ch);
           if (!states.length) { break; }
         }
 
