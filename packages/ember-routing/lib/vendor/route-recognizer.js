@@ -8,6 +8,7 @@ define("route-recognizer",
     ];
 
     var escapeRegex = new RegExp('(\\' + specials.join('|\\') + ')', 'g');
+    var queryRegex = '(?:;([^/]*))?';
 
     // A Segment represents a segment in the original route description.
     // Each Segment type provides an `eachChar` and `regex` method.
@@ -28,8 +29,9 @@ define("route-recognizer",
 
     function StaticSegment(string) { this.string = string; }
     StaticSegment.prototype = {
-      regex: function() {
-        return this.string.replace(escapeRegex, '\\$1');
+      regex: function(query) {
+        var r = this.string.replace(escapeRegex, '\\$1');
+        return query ? r + queryRegex : r;
       },
 
       generate: function() {
@@ -39,8 +41,8 @@ define("route-recognizer",
 
     function DynamicSegment(name) { this.name = name; }
     DynamicSegment.prototype = {
-      regex: function() {
-        return "([^/]+)";
+      regex: function(query) {
+        return query ? "([^/;]+)" + queryRegex : "([^/]+)";
       },
 
       generate: function(params) {
@@ -50,19 +52,13 @@ define("route-recognizer",
 
     function StarSegment(name) { this.name = name; }
     StarSegment.prototype = {
-      regex: function() {
-        return "(.+)";
+      regex: function(query) {
+        return query ? "([^;]+)" + queryRegex : "(.+)";
       },
 
       generate: function(params) {
         return params[this.name];
       }
-    };
-
-    function EpsilonSegment() {}
-    EpsilonSegment.prototype = {
-      regex: function() { return ""; },
-      generate: function() { return ""; }
     };
 
     function parse(route, names, types) {
@@ -84,7 +80,7 @@ define("route-recognizer",
           names.push(match[1]);
           types.stars++;
         } else if(segment === "") {
-          results.push(new EpsilonSegment());
+          // Ignore segment
         } else {
           results.push(new StaticSegment(segment));
           types.statics++;
@@ -237,15 +233,17 @@ define("route-recognizer",
           params[names[j]] = captures[currentCapture++];
         }
 
+        if (handler.hasQuery) {
+          queryString = captures[currentCapture++];
+          query = queryString ? deserializeQueryString(queryString) : {};
+        } else {
+          query = {};
+        }
         result.push({ handler: handler.handler, params: params,
           isDynamic: !!names.length, query: query });
       }
 
       return result;
-    }
-
-    function addSegment(currentState, segment) {
-      return currentState.put(segment.regex());
     }
 
     // The main interface
@@ -267,30 +265,30 @@ define("route-recognizer",
         for (var i=0, l=routes.length; i<l; i++) {
           var route = routes[i], names = [];
 
-          var segments = parse(route.path, names, types);
+          var segments = parse(route.path, names, types),
+              hasQuery = !!segments.length;
 
           allSegments = allSegments.concat(segments);
 
           for (var j=0, m=segments.length; j<m; j++) {
-            var segment = segments[j];
-
-            if (segment instanceof EpsilonSegment) { continue; }
+            var segment = segments[j],
+                lastSegment = ((j+1) == m),
+                // Allow a query string on every handler's last segment
+                segmentRegex = segment.regex(lastSegment);
 
             isEmpty = false;
-
-            regex += "/";
-
-            // Add a representation of the segment to the NFA and regex
-            currentState = addSegment(currentState, segment);
-            regex += segment.regex();
+            regex += '/'+segmentRegex;
+            currentState = currentState.put(segmentRegex);
           }
 
-          handlers.push({ handler: route.handler, names: names });
+          handlers.push({ handler: route.handler, names: names, hasQuery: hasQuery });
         }
 
         if (isEmpty) {
           currentState = currentState.put('');
-          regex += "/";
+          // Add a query string to the leaf handler
+          handlers[handlers.length - 1].hasQuery = true;
+          regex += "/"+queryRegex;
         }
 
         currentState.handlers = handlers;
@@ -328,8 +326,6 @@ define("route-recognizer",
 
         for (var i=0, l=segments.length; i<l; i++) {
           var segment = segments[i];
-
-          if (segment instanceof EpsilonSegment) { continue; }
 
           output += "/";
           output += segment.generate(params);
