@@ -112,7 +112,11 @@ Ember.Route = Ember.Object.extend({
     this.redirected = false;
     this._checkingRedirect = true;
 
-    this.redirect(context);
+    if (context === undefined) {
+      this.redirect();
+    } else {
+      this.redirect(context);
+    }
 
     this._checkingRedirect = false;
     if (this.redirected) { return false; }
@@ -192,15 +196,21 @@ Ember.Route = Ember.Object.extend({
     * The find method is called on the model class with the value of
       the dynamic segment.
 
-    TODO Find a way to use the query. Doing this automatically would
-         require a way to determine which model to use; possibly by
-         "singularizing" the routeName.
+    Note that for routes with dynamic segments, this hook is only
+    executed when entered via the URL. If the route is entered
+    through a transition (e.g. when using the `linkTo` Handlebars
+    helper), then a model context is already provided and this hook
+    is not called. Routes without dynamic segments will always
+    execute the model hook.
 
     @method model
     @param {Object} params the parameters extracted from the URL
     @param {Object} query Query string parameters extracted from the URL
   */
   model: function(params, query) {
+    // TODO Find a way to use the query. Doing this automatically would
+    // require a way to determine which model to use; possibly by
+    // "singularizing" the routeName.
     var match, name, sawParams, value;
 
     for (var prop in params) {

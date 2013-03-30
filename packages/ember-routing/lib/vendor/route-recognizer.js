@@ -423,7 +423,7 @@ define("route-recognizer",
       },
 
       recognize: function(path) {
-        var states = [ this.rootState ], i, l, inQuery, ch;
+        var states = [ this.rootState ], i, l;
 
         // DEBUG GROUP path
 
@@ -436,20 +436,7 @@ define("route-recognizer",
         }
 
         for (i=0, l=path.length; i<l; i++) {
-          ch = path.charAt(i);
-          if (inQuery) {
-            if (ch == '/') {
-              // No longer in a query string
-              inQuery = false;
-            } else {
-              // Ignore this character
-              continue;
-            }
-          } else if (ch == ';') {
-            inQuery = true;
-            continue;
-          }
-          states = recognizeChar(states, ch);
+          states = recognizeChar(states, path.charAt(i));
           if (!states.length) { break; }
         }
 

@@ -191,21 +191,6 @@ test("ApplicationView is inserted into the page", function() {
   equal(Ember.$("#qunit-fixture").text(), "Hello!");
 });
 
-test("Application initialized twice raises error", function() {
-  Ember.run(function() {
-    app = Ember.Application.create({
-      router: false,
-      rootElement: '#qunit-fixture'
-    });
-  });
-
-  raises(function(){
-    Ember.run(function() {
-      app.initialize();
-    });
-  }, Error, 'raises error');
-});
-
 test("Minimal Application initialized with just an application template", function() {
   Ember.$('#qunit-fixture').html('<script type="text/x-handlebars">Hello World</script>');
   Ember.run(function () {
@@ -302,8 +287,13 @@ module("Ember.Application Depedency Injection", {
 });
 
 test('container lookup is normalized', function() {
-  ok(locator.lookup('controller:post.index') instanceof application.PostIndexController);
-  ok(locator.lookup('controller:postIndex') instanceof application.PostIndexController);
+  var dotNotationController = locator.lookup('controller:post.index');
+  var camelCaseController = locator.lookup('controller:postIndex');
+
+  ok(dotNotationController instanceof application.PostIndexController);
+  ok(camelCaseController instanceof application.PostIndexController);
+
+  equal(dotNotationController, camelCaseController);
 });
 
 test('registered entities can be looked up later', function(){
