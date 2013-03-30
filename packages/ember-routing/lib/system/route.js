@@ -158,8 +158,9 @@ Ember.Route = Ember.Object.extend({
 
     @method deserialize
   */
-  deserialize: function(params) {
-    var model = this.model(params);
+  deserialize: function(params, query) {
+    this.currentQuery = query;
+    var model = this.model(params, query);
     return this.currentModel = model;
   },
 
@@ -191,10 +192,15 @@ Ember.Route = Ember.Object.extend({
     * The find method is called on the model class with the value of
       the dynamic segment.
 
+    TODO Find a way to use the query. Doing this automatically would
+         require a way to determine which model to use; possibly by
+         "singularizing" the routeName.
+
     @method model
     @param {Object} params the parameters extracted from the URL
+    @param {Object} query Query string parameters extracted from the URL
   */
-  model: function(params) {
+  model: function(params, query) {
     var match, name, sawParams, value;
 
     for (var prop in params) {
@@ -262,6 +268,18 @@ Ember.Route = Ember.Object.extend({
     }
 
     return object;
+  },
+
+  /**
+   * A hook you can implement to convert model parameters into
+   * a query string. By default, this returns the last query
+   * string that was set on this handler.
+   *
+   * @param {Object} model
+   * @return {Object}
+   */
+  serializeQuery: function(model) {
+    return this.currentQuery;
   },
 
   /**
@@ -540,4 +558,10 @@ function teardownView(route) {
 
   delete route.teardownView;
   delete route.lastRenderedTemplate;
+}
+
+function Query(route, object, query) {
+  this.route = route;
+  this.object = object;
+  this.query = query;
 }

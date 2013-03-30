@@ -159,13 +159,27 @@ define("router",
 
         Used internally by `generate` and `transitionTo`.
       */
-      _paramsForHandler: function(handlerName, objects, doUpdate) {
+      _paramsForHandler: function(handlerName, args, doUpdate) {
         var handlers = this.recognizer.handlersFor(handlerName),
             params = {},
+            objects = [],
+            queries = {},
             toSetup = [],
             startIdx = handlers.length,
-            objectsToMatch = objects.length,
-            object, objectChanged, handlerObj, handler, names, i, len;
+            objectsToMatch, object, objectChanged, handlerObj,
+            handler, names, query, arg, i, len;
+
+        // Separate objects and query objects
+        for (i = 0, len = args.length; i < len; i++) {
+          arg = args[i];
+          if (arg instanceof Ember.RouteQuery) {
+            queries[arg.handler] = arg.query;
+          } else {
+            objects.push(arg);
+          }
+        }
+
+        objectsToMatch = objects.length;
 
         // Find out which handler to start matching at
         for (i=handlers.length-1; i>=0 && objectsToMatch>0; i--) {
@@ -182,6 +196,7 @@ define("router",
         // Connect the objects to the routes
         for (i=0, len=handlers.length; i<len; i++) {
           handlerObj = handlers[i];
+          query = queries[handlerObj.handler];
           handler = this.getHandler(handlerObj.handler);
           names = handlerObj.names;
           objectChanged = false;
@@ -205,9 +220,9 @@ define("router",
           } else if (doUpdate) {
             // If we've passed the match point we need to deserialize again
             // or if we never had a context
-            if (i > startIdx || !handler.hasOwnProperty('context')) {
+            if (i > startIdx || !handler.hasOwnProperty('context') || query) {
               if (handler.deserialize) {
-                object = handler.deserialize({});
+                object = handler.deserialize({}, query || {});
                 objectChanged = true;
               }
             // Otherwise use existing context
@@ -215,6 +230,12 @@ define("router",
               object = handler.context;
             }
           }
+
+          // Make sure there's a query object.
+          if (!query) {
+            query = (handler.serializeQuery && handler.serializeQuery(object)) || {};
+          }
+          queries[handlerObj.query] = query;
 
           // Make sure that we update the context here so it's available to
           // subsequent deserialize calls
@@ -374,7 +395,7 @@ define("router",
 
       var result = results[index];
       var handler = router.getHandler(result.handler);
-      var object = handler.deserialize && handler.deserialize(result.params);
+      var object = handler.deserialize && handler.deserialize(result.params, result.query);
 
       if (object && typeof object.then === 'function') {
         loading(router);

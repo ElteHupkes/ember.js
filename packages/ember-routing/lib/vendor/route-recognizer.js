@@ -257,13 +257,35 @@ define("route-recognizer",
      * @param {String} queryString
      * @returns {Object}
      */
-    function parseQueryString(queryString) {
-      var pairs = queryString.split(';'), i, l, pair, query = {};
+    function deserializeQueryString(queryString) {
+      var pairs = queryString.split(';'), i, l,
+          pair, query = {};
+      var r = function(str) {
+        return str.replace('%3D', '=').replace('%3B', ';');
+      };
       for (i = 0, l = pairs.length; i < l; i++) {
         pair = pairs[i].split("=");
-        query[pair[0]] = pair.length > 1 ? pair[1] : true;
+        query[r(pair[0])] = pair.length > 1 ? r(pair[1]) : true;
       }
       return query;
+    }
+
+    /**
+     * Serializes a query object into a Matrix-parameter
+     * query string.
+     * @param {Object} query
+     * @returns {string}
+     */
+    function serializeQuery(query) {
+      var str = [], r = function(str) {
+        // Doubly encode separators (setting them won't always automatically URL-encode)
+        return str.replace(';', '%253B').replace('=', '%253D');
+      };
+      for (var k in query) {
+        str.push();
+        str.push(r(k) + "=" + r(query[k]));
+      }
+      return str.join(';');
     }
 
     function findHandler(state, path) {
@@ -283,7 +305,7 @@ define("route-recognizer",
         // so skip it (it's always the first handler)
         if (i > 0) {
           queryString = captures[currentCapture++];
-          query = queryString ? parseQueryString(queryString) : {};
+          query = queryString ? deserializeQueryString(queryString) : {};
         } else {
           query = {};
         }
@@ -353,7 +375,8 @@ define("route-recognizer",
         }
 
         currentState.handlers = handlers;
-        currentState.regex = new RegExp(regex + "(?:;(.+))?$");
+        // Add a query string capture to the regex
+        currentState.regex = new RegExp(regex + "(?:;(.*))?$");
         currentState.types = types;
 
         if (name = options && options.as) {
