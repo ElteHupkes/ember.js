@@ -28,15 +28,6 @@ define("route-recognizer",
 
     function StaticSegment(string) { this.string = string; }
     StaticSegment.prototype = {
-      eachChar: function(callback) {
-        var string = this.string, char;
-
-        for (var i=0, l=string.length; i<l; i++) {
-          char = string.charAt(i);
-          callback({ validChars: char });
-        }
-      },
-
       regex: function() {
         return this.string.replace(escapeRegex, '\\$1');
       },
@@ -48,10 +39,6 @@ define("route-recognizer",
 
     function DynamicSegment(name) { this.name = name; }
     DynamicSegment.prototype = {
-      eachChar: function(callback) {
-        callback({ invalidChars: "/", repeat: true });
-      },
-
       regex: function() {
         return "([^/]+)";
       },
@@ -63,10 +50,6 @@ define("route-recognizer",
 
     function StarSegment(name) { this.name = name; }
     StarSegment.prototype = {
-      eachChar: function(callback) {
-        callback({ invalidChars: "", repeat: true });
-      },
-
       regex: function() {
         return "(.+)";
       },
@@ -78,7 +61,6 @@ define("route-recognizer",
 
     function EpsilonSegment() {}
     EpsilonSegment.prototype = {
-      eachChar: function() {},
       regex: function() { return ""; },
       generate: function() { return ""; }
     };
@@ -129,102 +111,56 @@ define("route-recognizer",
     // comparing a character specification against a character. A more efficient
     // implementation would use a hash of keys pointing at one or more next states.
 
-    function State(charSpec) {
-      this.charSpec = charSpec;
+    function State(segmentRegex) {
+      this.segmentRegex = segmentRegex;
       this.nextStates = [];
     }
 
     State.prototype = {
-      get: function(charSpec) {
+      get: function(segmentRegex) {
         var nextStates = this.nextStates;
 
         for (var i=0, l=nextStates.length; i<l; i++) {
           var child = nextStates[i];
-
-          var isEqual = child.charSpec.validChars === charSpec.validChars;
-          isEqual = isEqual && child.charSpec.invalidChars === charSpec.invalidChars;
-
-          if (isEqual) { return child; }
+          if (child.segmentRegex == segmentRegex) { return child; }
         }
       },
 
-      put: function(charSpec) {
+      put: function(segmentRegex) {
         var state;
+        segmentRegex = '^'+segmentRegex+'$';
 
         // If the character specification already exists in a child of the current
         // state, just return that state.
-        if (state = this.get(charSpec)) { return state; }
+        if (state = this.get(segmentRegex)) { return state; }
 
         // Make a new state for the character spec
-        state = new State(charSpec);
+        state = new State(segmentRegex);
 
         // Insert the new state as a child of the current state
         this.nextStates.push(state);
-
-        // If this character specification repeats, insert the new state as a child
-        // of itself. Note that this will not trigger an infinite loop because each
-        // transition during recognition consumes a character.
-        if (charSpec.repeat) {
-          state.nextStates.push(state);
-        }
 
         // Return the new state
         return state;
       },
 
       // Find a list of child states matching the next character
-      match: function(char) {
-        // DEBUG "Processing `" + char + "`:"
-        var nextStates = this.nextStates,
-            child, charSpec, chars;
+      match: function(segment) {
+        var nextStates = this.nextStates, child;
 
-        // DEBUG "  " + debugState(this)
         var returned = [];
 
         for (var i=0, l=nextStates.length; i<l; i++) {
           child = nextStates[i];
 
-          charSpec = child.charSpec;
-
-          if (typeof (chars = charSpec.validChars) !== 'undefined') {
-            if (chars.indexOf(char) !== -1) { returned.push(child); }
-          } else if (typeof (chars = charSpec.invalidChars) !== 'undefined') {
-            if (chars.indexOf(char) === -1) { returned.push(child); }
+          if (segment.match(child.segmentRegex)) {
+            returned.push(child);
           }
         }
 
         return returned;
       }
-
-      /** IF DEBUG
-      , debug: function() {
-        var charSpec = this.charSpec,
-            debug = "[",
-            chars = charSpec.validChars || charSpec.invalidChars;
-
-        if (charSpec.invalidChars) { debug += "^"; }
-        debug += chars;
-        debug += "]";
-
-        if (charSpec.repeat) { debug += "+"; }
-
-        return debug;
-      }
-      END IF **/
     };
-
-    /** IF DEBUG
-    function debug(log) {
-      console.log(log);
-    }
-
-    function debugState(state) {
-      return state.nextStates.map(function(n) {
-        if (n.nextStates.length === 0) { return "( " + n.debug() + " [accepting] )"; }
-        return "( " + n.debug() + " <then> " + n.nextStates.map(function(s) { return s.debug() }).join(" or ") + " )";
-      }).join(", ")
-    }
-    END IF **/
 
     // This is a somewhat naive strategy, but should work in a lot of cases
     // A better strategy would properly resolve /posts/:id/new and /posts/edit/:id
@@ -238,13 +174,13 @@ define("route-recognizer",
       });
     }
 
-    function recognizeChar(states, char) {
+    function recognizeSegment(states, segment) {
       var nextStates = [];
 
       for (var i=0, l=states.length; i<l; i++) {
         var state = states[i];
 
-        nextStates = nextStates.concat(state.match(char));
+        nextStates = nextStates.concat(state.match(segment));
       }
 
       return nextStates;
@@ -301,15 +237,6 @@ define("route-recognizer",
           params[names[j]] = captures[currentCapture++];
         }
 
-        // The application handler doesn't have a query string capture,
-        // so skip it (it's always the first handler)
-        if (i > 0) {
-          queryString = captures[currentCapture++];
-          query = queryString ? deserializeQueryString(queryString) : {};
-        } else {
-          query = {};
-        }
-
         result.push({ handler: handler.handler, params: params,
           isDynamic: !!names.length, query: query });
       }
@@ -318,13 +245,7 @@ define("route-recognizer",
     }
 
     function addSegment(currentState, segment) {
-      segment.eachChar(function(char) {
-        var state;
-
-        currentState = currentState.put(char);
-      });
-
-      return currentState;
+      return currentState.put(segment.regex());
     }
 
     // The main interface
@@ -357,8 +278,6 @@ define("route-recognizer",
 
             isEmpty = false;
 
-            // Add a "/" for the new segment
-            currentState = currentState.put({ validChars: "/" });
             regex += "/";
 
             // Add a representation of the segment to the NFA and regex
@@ -370,13 +289,12 @@ define("route-recognizer",
         }
 
         if (isEmpty) {
-          currentState = currentState.put({ validChars: "/" });
+          currentState = currentState.put('');
           regex += "/";
         }
 
         currentState.handlers = handlers;
-        // Add a query string capture to the regex
-        currentState.regex = new RegExp(regex + "(?:;(.*))?$");
+        currentState.regex = new RegExp(regex + "$");
         currentState.types = types;
 
         if (name = options && options.as) {
@@ -435,8 +353,11 @@ define("route-recognizer",
           path = path.substr(0, pathLen - 1);
         }
 
-        for (i=0, l=path.length; i<l; i++) {
-          states = recognizeChar(states, path.charAt(i));
+        var segments = path.split('/');
+
+        // Start at i=1, ignoring the "empty" segment before the slash
+        for (i=1, l=segments.length; i<l; i++) {
+          states = recognizeSegment(states, segments[i]);
           if (!states.length) { break; }
         }
 
@@ -447,7 +368,7 @@ define("route-recognizer",
           if (states[i].handlers) { solutions.push(states[i]); }
         }
 
-        states = sortSolutions(solutions);
+        sortSolutions(solutions);
 
         var state = solutions[0];
 
