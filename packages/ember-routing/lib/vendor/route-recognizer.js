@@ -103,7 +103,7 @@ define("route-recognizer",
       return results;
     }
 
-    // A State has a character specification and (`charSpec`) and a list of possible
+    // A State has a segment regex and (`segmentRegex`) and a list of possible
     // subsequent states (`nextStates`).
     //
     // If a State is an accepting state, it will also have several additional
@@ -116,9 +116,8 @@ define("route-recognizer",
     // * `types`: How many static, dynamic or star segments in this route. Used to
     //   decide which route to use if multiple registered routes match a path.
     //
-    // Currently, State is implemented naively by looping over `nextStates` and
-    // comparing a character specification against a character. A more efficient
-    // implementation would use a hash of keys pointing at one or more next states.
+    // State is implemented by looping over its next states to see which
+    // of their segment regexes matches the supplied segment.
 
     function State(segmentRegex) {
       this.segmentRegex = segmentRegex;

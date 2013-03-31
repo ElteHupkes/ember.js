@@ -213,6 +213,19 @@ define("router",
           names = handlerObj.names;
           objectChanged = false;
 
+          // We need to determine which query object to use
+          // Rules:
+          // - A specified query object for a handler always overrides that
+          //   any other rule.
+          // - Specifying a boolean "false" for the query clears the query object for that handler
+          // - If you specify an object, the query object is determined by calling
+          //   serializeQuery on the handler; which is supposed to extract
+          //   the query from the object.
+          // - An undefined query object maintains the current query.
+          if (query === false) {
+            query = {};
+          }
+
           // If it's a dynamic segment
           if (names.length) {
             // If we have objects, use them
@@ -224,6 +237,12 @@ define("router",
               object = handler.context;
             }
 
+            if (!query) {
+              // Serialize query object params, but only if no query object was supplied
+              // for this handler.
+              query = (handler.serializeQuery && handler.serializeQuery(object)) || {};
+            }
+
             // Serialize to generate params
             if (handler.serialize) {
               merge(params, handler.serialize(object, names));
@@ -231,10 +250,11 @@ define("router",
           // If it's not a dynamic segment and we're updating
           } else if (doUpdate) {
             // If we've passed the match point we need to deserialize again
-            // or if we never had a context
+            // or if we never had a context, or if a new query object was specified
             if (i > startIdx || !handler.hasOwnProperty('context') || query) {
+              query = query || handler.currentQuery || {};
               if (handler.deserialize) {
-                object = handler.deserialize({}, query || {});
+                object = handler.deserialize({}, query);
                 objectChanged = true;
               }
             // Otherwise use existing context
@@ -243,11 +263,9 @@ define("router",
             }
           }
 
-          // Make sure there's a query object.
-          if (!query) {
-            query = (handler.serializeQuery && handler.serializeQuery(object)) || {};
+          if (doUpdate && query) {
+            handler.currentQuery = query;
           }
-          queries[handlerObj.handler] = query;
 
           // Make sure that we update the context here so it's available to
           // subsequent deserialize calls
@@ -255,6 +273,8 @@ define("router",
             // TODO: It's a bit awkward to set the context twice, see if we can DRY things up
             setContext(handler, object);
           }
+
+          queries[handlerObj.handler] = query || handler.currentQuery || {};
 
           toSetup.push({
             isDynamic: !!handlerObj.names.length,

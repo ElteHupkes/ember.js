@@ -163,7 +163,6 @@ Ember.Route = Ember.Object.extend({
     @method deserialize
   */
   deserialize: function(params, query) {
-    this.currentQuery = query;
     var model = this.model(params, query);
     return this.currentModel = model;
   },
@@ -282,14 +281,13 @@ Ember.Route = Ember.Object.extend({
 
   /**
    * A hook you can implement to convert model parameters into
-   * a query string. By default, this returns the last query
-   * string that was set on this handler.
+   * a query string. Returns an empty object by default.
    *
    * @param {Object} model
    * @return {Object}
    */
   serializeQuery: function(model) {
-    return this.currentQuery;
+    return {};
   },
 
   /**
