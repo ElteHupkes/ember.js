@@ -273,7 +273,7 @@ define("route-recognizer",
       add: function(routes, options) {
         var currentState = this.rootState, regex = "^",
             types = { statics: 0, dynamics: 0, stars: 0 },
-            handlers = [], allSegments = [], name;
+            handlers = [], allSegments = [], name, segmentRegex;
 
         var isEmpty = true;
 
@@ -286,8 +286,7 @@ define("route-recognizer",
 
           for (var j=0, m=segments.length; j<m; j++) {
             var segment = segments[j],
-                isLastSegment = ((j+1) === m),
-                segmentRegex;
+                isLastSegment = ((j+1) === m);
 
             isEmpty = false;
 
@@ -312,7 +311,7 @@ define("route-recognizer",
           lastHandler.hasQuery = true;
           e.query = lastHandler.handler;
 
-          var segmentRegex = e.regex();
+          segmentRegex = e.regex();
           currentState = currentState.put(segmentRegex);
           regex += "/"+ segmentRegex;
           allSegments.push(e);
