@@ -164,6 +164,7 @@ Ember.Route = Ember.Object.extend({
   */
   deserialize: function(params, query) {
     var model = this.model(params, query);
+    this.currentQuery = query;
     return this.currentModel = model;
   },
 
