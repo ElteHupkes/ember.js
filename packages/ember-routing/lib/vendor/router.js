@@ -237,9 +237,9 @@ define("router",
               object = handler.context;
             }
 
-            if (!query) {
-              // Serialize query object params, but only if no query object was supplied
-              // for this handler.
+            if (!query || query === (handler.currentQuery)) {
+              // Serialize query object params, but only if no new query object
+              // was supplied for this handler.
               query = (handler.serializeQuery && handler.serializeQuery(object)) || {};
             }
 
@@ -251,7 +251,8 @@ define("router",
           } else if (doUpdate) {
             // If we've passed the match point we need to deserialize again
             // or if we never had a context, or if a new query object was specified
-            if (i > startIdx || !handler.hasOwnProperty('context') || query) {
+            var queryChanged = query && (query !== handler.currentQuery);
+            if (i > startIdx || !handler.hasOwnProperty('context') || queryChanged) {
               query = query || handler.currentQuery || {};
               if (handler.deserialize) {
                 object = handler.deserialize({}, query);

@@ -35,8 +35,10 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
 
     Ember.assert("The route " + passedRouteName + " was not found", router.hasRoute(routeName));
 
-    var ret = [ routeName ].concat(resolvedPaths(linkView.parameters)), query;
-    if (query = linkView.get('handlerQuery')) {
+    var ret = [ routeName ].concat(resolvedPaths(linkView.parameters)),
+        query = linkView.get('handlerQuery');
+
+    if (query || query === false) {
       ret.push(router.routeQuery(routeName, query));
     }
     return ret;
@@ -87,7 +89,7 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
           query[queryList[i]] = this.get(queryList[i]);
         }
 
-        return query === false ? {} : query;
+        return query;
       });
 
       func.property.apply(func, args);
