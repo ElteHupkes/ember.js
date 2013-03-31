@@ -449,7 +449,8 @@ define("router",
         var updatedObjects = objects.concat([{
           context: value,
           handler: result.handler,
-          isDynamic: result.isDynamic
+          isDynamic: result.isDynamic,
+          query: result.query
         }]);
         collectObjects(router, results, index + 1, updatedObjects);
       }
