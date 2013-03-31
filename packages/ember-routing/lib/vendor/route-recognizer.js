@@ -306,13 +306,15 @@ define("route-recognizer",
         }
 
         if (isEmpty) {
-          currentState = currentState.put('');
           // Add a query string to the leaf handler of an empty route
           var e = new EpsilonSegment(),
-              lastHandler = handlers[handlers.length - 1];
+            lastHandler = handlers[handlers.length - 1];
           lastHandler.hasQuery = true;
           e.query = lastHandler.handler;
-          regex += "/"+ e.regex();
+
+          var segmentRegex = e.regex();
+          currentState = currentState.put(segmentRegex);
+          regex += "/"+ segmentRegex;
           allSegments.push(e);
         }
 
