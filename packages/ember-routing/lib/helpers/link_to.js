@@ -80,7 +80,7 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
           query = {};
         }
 
-        Ember.assert("Link query has to be an object", !query || typeof query == "object");
+        Ember.assert("Link query has to be an object", !query || typeof query === "object");
 
         // Expand with static query arguments
         for (var i = 0, l = queryList.length; i < l; i++) {

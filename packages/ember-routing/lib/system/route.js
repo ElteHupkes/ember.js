@@ -108,7 +108,7 @@ Ember.Route = Ember.Object.extend({
 
     @method setup
   */
-  setup: function(context) {
+  setup: function(context, query) {
     this.redirected = false;
     this._checkingRedirect = true;
 
@@ -132,7 +132,7 @@ Ember.Route = Ember.Object.extend({
       Ember.deprecate("Ember.Route.setupControllers is deprecated. Please use Ember.Route.setupController(controller, model) instead.");
       this.setupControllers(controller, context);
     } else {
-      this.setupController(controller, context);
+      this.setupController(controller, context, query);
     }
 
     if (this.renderTemplates) {

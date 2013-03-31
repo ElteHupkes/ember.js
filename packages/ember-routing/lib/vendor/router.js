@@ -260,7 +260,8 @@ define("router",
             isDynamic: !!handlerObj.names.length,
             handler: handlerObj.handler,
             name: handlerObj.name,
-            context: object
+            context: object,
+            query: query
           });
         }
 
@@ -487,18 +488,18 @@ define("router",
         if (handler.exit) { handler.exit(); }
       });
 
-      eachHandler(partition.updatedContext, function(handler, context) {
+      eachHandler(partition.updatedContext, function(handler, context, query) {
         setContext(handler, context);
-        if (handler.setup) { handler.setup(context); }
+        if (handler.setup) { handler.setup(context, query); }
       });
 
       var aborted = false;
-      eachHandler(partition.entered, function(handler, context) {
+      eachHandler(partition.entered, function(handler, context, query) {
         if (aborted) { return; }
         if (handler.enter) { handler.enter(); }
         setContext(handler, context);
         if (handler.setup) {
-          if (false === handler.setup(context)) {
+          if (false === handler.setup(context, query)) {
             aborted = true;
           }
         }
@@ -522,9 +523,10 @@ define("router",
       for (var i=0, l=handlerInfos.length; i<l; i++) {
         var handlerInfo = handlerInfos[i],
             handler = handlerInfo.handler,
-            context = handlerInfo.context;
+            context = handlerInfo.context,
+            query = handlerInfo.query;
 
-        callback(handler, context);
+        callback(handler, context, query);
       }
     }
 
