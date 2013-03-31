@@ -131,7 +131,7 @@ define("route-recognizer",
 
         for (var i=0, l=nextStates.length; i<l; i++) {
           var child = nextStates[i];
-          if (child.segmentRegex == segmentRegex) { return child; }
+          if (child.segmentRegex === segmentRegex) { return child; }
         }
       },
 
@@ -287,7 +287,7 @@ define("route-recognizer",
 
           for (var j=0, m=segments.length; j<m; j++) {
             var segment = segments[j],
-                isLastSegment = ((j+1) == m),
+                isLastSegment = ((j+1) === m),
                 segmentRegex;
 
             isEmpty = false;
@@ -355,8 +355,8 @@ define("route-recognizer",
           output += "/";
           output += segment.generate(params);
 
-          if (segment.query && queries[segment.query]
-                && (queryString = serializeQuery(queries[segment.query]))) {
+          if (segment.query && queries[segment.query] &&
+                (queryString = serializeQuery(queries[segment.query]))) {
             output += ';'+queryString;
           }
         }
