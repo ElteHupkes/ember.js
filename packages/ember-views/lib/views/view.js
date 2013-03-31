@@ -54,18 +54,6 @@ Ember.CoreView = Ember.Object.extend(Ember.Evented, {
 
   init: function() {
     this._super();
-
-    // Register the view for event handling. This hash is used by
-    // Ember.EventDispatcher to dispatch incoming events.
-    if (!this.isVirtual) {
-      Ember.assert("Attempted to register a view with an id already in use: "+this.elementId, !Ember.View.views[this.elementId]);
-      Ember.View.views[this.elementId] = this;
-    }
-
-    this.addBeforeObserver('elementId', function() {
-      throw new Error("Changing a view's elementId after creation is not allowed");
-    });
-
     this.transitionTo('preRender');
   },
 
@@ -95,7 +83,7 @@ Ember.CoreView = Ember.Object.extend(Ember.Evented, {
   concreteView: Ember.computed(function() {
     if (!this.isVirtual) { return this; }
     else { return get(this, 'parentView'); }
-  }).property('parentView').volatile(),
+  }).property('parentView'),
 
   instrumentName: 'core_view',
 
@@ -180,8 +168,10 @@ Ember.CoreView = Ember.Object.extend(Ember.Evented, {
     return Ember.typeOf(this[name]) === 'function' || this._super(name);
   },
 
-  willDestroy: function() {
+  destroy: function() {
     var parent = this._parentView;
+
+    if (!this._super()) { return; }
 
     // destroy the element -- this will avoid each child view destroying
     // the element over and over again...
@@ -192,10 +182,9 @@ Ember.CoreView = Ember.Object.extend(Ember.Evented, {
     // the DOM again.
     if (parent) { parent.removeChild(this); }
 
-    this.transitionTo('destroyed');
+    this.transitionTo('destroying', false);
 
-    // next remove view from global hash
-    if (!this.isVirtual) delete Ember.View.views[this.elementId];
+    return this;
   },
 
   clearRenderedChildren: Ember.K,
@@ -204,6 +193,59 @@ Ember.CoreView = Ember.Object.extend(Ember.Evented, {
   transitionTo: Ember.K,
   destroyElement: Ember.K
 });
+
+var ViewCollection = Ember._ViewCollection = function(initialViews) {
+  var views = this.views = initialViews || [];
+  this.length = views.length;
+};
+
+ViewCollection.prototype = {
+  length: 0,
+
+  trigger: function(eventName) {
+    var views = this.views, view;
+    for (var i = 0, l = views.length; i < l; i++) {
+      view = views[i];
+      if (view.trigger) { view.trigger(eventName); }
+    }
+  },
+
+  triggerRecursively: function(eventName) {
+    var views = this.views;
+    for (var i = 0, l = views.length; i < l; i++) {
+      views[i].triggerRecursively(eventName);
+    }
+  },
+
+  transitionTo: function(state, children) {
+    var views = this.views;
+    for (var i = 0, l = views.length; i < l; i++) {
+      views[i].transitionTo(state, children);
+    }
+  },
+
+  push: function() {
+    this.length += arguments.length;
+    var views = this.views;
+    return views.push.apply(views, arguments);
+  },
+
+  objectAt: function(idx) {
+    return this.views[idx];
+  },
+
+  forEach: function() {
+    var views = this.views;
+    return views.forEach.apply(views, arguments);
+  },
+
+  clear: function() {
+    this.length = 0;
+    this.views.length = 0;
+  }
+};
+
+var EMPTY_ARRAY = [];
 
 /**
   `Ember.View` is the class in Ember responsible for encapsulating templates of
@@ -975,7 +1017,7 @@ Ember.View = Ember.CoreView.extend(
   */
   childViews: childViewsProperty,
 
-  _childViews: [],
+  _childViews: EMPTY_ARRAY,
 
   // When it's a virtual view, we need to notify the parent that their
   // childViews will change.
@@ -1615,6 +1657,19 @@ Ember.View = Ember.CoreView.extend(
     }
   },
 
+  viewHierarchyCollection: function() {
+    var currentView, viewCollection = new ViewCollection([this]);
+
+    for (var i = 0; i < viewCollection.length; i++) {
+      currentView = viewCollection.objectAt(i);
+      if (currentView._childViews) {
+        viewCollection.push.apply(viewCollection, currentView._childViews);
+      }
+    }
+
+    return viewCollection;
+  },
+
   /**
     Destroys any existing element along with the element for any child views
     as well. If the view does not currently have a element, then this method
@@ -1659,8 +1714,10 @@ Ember.View = Ember.CoreView.extend(
     @method _notifyWillDestroyElement
   */
   _notifyWillDestroyElement: function() {
-    this.triggerRecursively('willClearRender');
-    this.triggerRecursively('willDestroyElement');
+    var viewCollection = this.viewHierarchyCollection();
+    viewCollection.trigger('willClearRender');
+    viewCollection.trigger('willDestroyElement');
+    return viewCollection;
   },
 
   _elementWillChange: Ember.beforeObserver(function() {
@@ -1706,8 +1763,8 @@ Ember.View = Ember.CoreView.extend(
     return buffer;
   },
 
-  renderToBufferIfNeeded: function () {
-    return this.currentState.renderToBufferIfNeeded(this, this);
+  renderToBufferIfNeeded: function (buffer) {
+    return this.currentState.renderToBufferIfNeeded(this, buffer);
   },
 
   beforeRender: function(buffer) {
@@ -1835,7 +1892,7 @@ Ember.View = Ember.CoreView.extend(
     @type Array
     @default []
   */
-  classNameBindings: [],
+  classNameBindings: EMPTY_ARRAY,
 
   /**
     A list of properties of the view to apply as attributes. If the property is
@@ -1863,7 +1920,7 @@ Ember.View = Ember.CoreView.extend(
 
     @property attributeBindings
   */
-  attributeBindings: [],
+  attributeBindings: EMPTY_ARRAY,
 
   // .......................................................
   // CORE DISPLAY METHODS
@@ -1973,18 +2030,17 @@ Ember.View = Ember.CoreView.extend(
     sure that the DOM element managed by the view can be released by the
     memory manager.
 
-    @method willDestroy
+    @method destroy
   */
-  willDestroy: function() {
-    // calling this._super() will nuke computed properties and observers,
-    // so collect any information we need before calling super.
+  destroy: function() {
     var childViews = this._childViews,
         parent = this._parentView,
+        // get parentView before calling super because it'll be destroyed
+        nonVirtualParentView = get(this, 'parentView'),
+        viewName = this.viewName,
         childLen, i;
 
-    // destroy the element -- this will avoid each child view destroying
-    // the element over and over again...
-    if (!this.removedFromDOM) { this.destroyElement(); }
+    if (!this._super()) { return; }
 
     childLen = childViews.length;
     for (i=childLen-1; i>=0; i--) {
@@ -1992,27 +2048,16 @@ Ember.View = Ember.CoreView.extend(
     }
 
     // remove from non-virtual parent view if viewName was specified
-    if (this.viewName) {
-      var nonVirtualParentView = get(this, 'parentView');
-      if (nonVirtualParentView) {
-        set(nonVirtualParentView, this.viewName, null);
-      }
+    if (viewName && nonVirtualParentView) {
+      nonVirtualParentView[viewName] = null;
     }
-
-    // remove from parent if found. Don't call removeFromParent,
-    // as removeFromParent will try to remove the element from
-    // the DOM again.
-    if (parent) { parent.removeChild(this); }
-
-    this.transitionTo('destroyed');
 
     childLen = childViews.length;
     for (i=childLen-1; i>=0; i--) {
       childViews[i].destroy();
     }
 
-    // next remove view from global hash
-    if (!this.isVirtual) delete Ember.View.views[get(this, 'elementId')];
+    return this;
   },
 
   /**
@@ -2127,8 +2172,12 @@ Ember.View = Ember.CoreView.extend(
   },
 
   transitionTo: function(state, children) {
-    this.currentState = this.states[state];
+    var priorState = this.currentState,
+        currentState = this.currentState = this.states[state];
     this.state = state;
+
+    if (priorState && priorState.exit) { priorState.exit(this); }
+    if (currentState.enter) { currentState.enter(this); }
 
     if (children !== false) {
       this.forEachChildView(function(view) {

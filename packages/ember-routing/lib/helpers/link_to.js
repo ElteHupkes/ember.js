@@ -98,7 +98,7 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
     // so that you can access the parent with {{view.prop}}
     concreteView: Ember.computed(function() {
       return get(this, 'parentView');
-    }).property('parentView').volatile(),
+    }).property('parentView'),
 
     active: Ember.computed(function() {
       var router = this.get('router'),
