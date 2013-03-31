@@ -116,6 +116,10 @@ Ember.Router = Ember.Object.extend({
     return this.router.hasRoute(route);
   },
 
+  routeQuery: function(handler, query) {
+    return this.router.routeQuery(handler, query);
+  },
+
   _lookupActiveView: function(templateName) {
     var active = this._activeViews[templateName];
     return active && active[0];

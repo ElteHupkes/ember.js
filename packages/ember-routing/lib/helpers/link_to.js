@@ -3,7 +3,8 @@
 @submodule ember-routing
 */
 
-var get = Ember.get, set = Ember.set;
+var get = Ember.get, set = Ember.set,
+  forEach = Ember.ArrayPolyfills.forEach;
 
 require('ember-handlebars/helpers/view');
 
@@ -34,8 +35,11 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
 
     Ember.assert("The route " + passedRouteName + " was not found", router.hasRoute(routeName));
 
-    var ret = [ routeName ];
-    return ret.concat(resolvedPaths(linkView.parameters));
+    var ret = [ routeName ].concat(resolvedPaths(linkView.parameters)), query;
+    if (query = linkView.get('handlerQuery')) {
+      ret.push(router.routeQuery(routeName, query));
+    }
+    return ret;
   }
 
   /**
@@ -65,6 +69,28 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
     replace: false,
     attributeBindings: ['href', 'title'],
     classNameBindings: 'active',
+
+    init: function() {
+      this._super.apply(this, arguments);
+
+      var args = ['query'].concat(this.get('queryList'));
+      var func = Ember.computed(function() {
+        var query = this.get('query'), queryList = this.get('queryList');
+        if (!query && queryList.length) {
+          query = {};
+        }
+
+        // Expand with static query arguments
+        for (var i = 0, l = queryList.length; i < l; i++) {
+          query[queryList[i]] = this.get(queryList[i]);
+        }
+
+        return query;
+      });
+
+      func.property.apply(func, args);
+      Ember.defineProperty(this, 'handlerQuery', func);
+    },
 
     // Even though this isn't a virtual view, we want to treat it as if it is
     // so that you can access the parent with {{view.prop}}
@@ -104,7 +130,7 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
     href: Ember.computed(function() {
       var router = this.get('router');
       return router.generate.apply(router, args(this, router));
-    })
+    }).property('handlerQuery')
   });
 
   LinkView.toString = function() { return "LinkView"; };
@@ -121,7 +147,19 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
     var params = [].slice.call(arguments, 1, -1);
 
     var hash = options.hash;
+    var isQueryRegex = /^(.+)Query(Binding)?$/, queryList = [],
+        match;
 
+    // Detect query strings for referenced handler
+    forEach.call(Ember.keys(hash), function(key) {
+      if (match = key.match(isQueryRegex)) {
+        hash[match[1]+(match[2] || '')] = hash[key];
+        queryList.push(match[1]);
+        delete hash[key];
+      }
+    });
+
+    hash.queryList = queryList;
     hash.namedRoute = name;
     hash.currentWhen = hash.currentWhen || name;
 

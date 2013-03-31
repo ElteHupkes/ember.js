@@ -125,6 +125,18 @@ define("router",
       },
 
       /**
+       * Returns a RouteQuery object, which can be used to specify query
+       * string parameters for specific handlers in generate / transitionTo
+       * calls.
+       * @param {String} handler The name of the handler
+       * @param {Object} query
+       * @returns {RouteQuery}
+       */
+      routeQuery: function(handler, query) {
+        return new RouteQuery(handler, query);
+      },
+
+      /**
         @private
 
         This method takes a handler name and a list of contexts and returns
@@ -143,15 +155,15 @@ define("router",
         Take a named route and context objects and generate a
         URL.
 
-        @param {String} name the name of the route to generate
+        @param {String} handlerName the name of the route to generate
           a URL for
         @param {...Object} objects a list of objects to serialize
 
         @return {String} a URL
       */
       generate: function(handlerName) {
-        var params = this.paramsForHandler.apply(this, arguments);
-        return this.recognizer.generate(handlerName, params);
+        var output = this._paramsForHandler(handlerName, [].slice.call(arguments, 1));
+        return this.recognizer.generate(handlerName, output.params, output.queries);
       },
 
       /**
@@ -172,7 +184,7 @@ define("router",
         // Separate objects and query objects
         for (i = 0, len = args.length; i < len; i++) {
           arg = args[i];
-          if (arg instanceof Ember.RouteQuery) {
+          if (arg instanceof RouteQuery) {
             queries[arg.handler] = arg.query;
           } else {
             objects.push(arg);
@@ -235,7 +247,7 @@ define("router",
           if (!query) {
             query = (handler.serializeQuery && handler.serializeQuery(object)) || {};
           }
-          queries[handlerObj.query] = query;
+          queries[handlerObj.handler] = query;
 
           // Make sure that we update the context here so it's available to
           // subsequent deserialize calls
@@ -252,7 +264,7 @@ define("router",
           });
         }
 
-        return { params: params, toSetup: toSetup };
+        return { params: params, toSetup: toSetup, queries: queries };
       },
 
       isActive: function(handlerName) {
@@ -363,7 +375,7 @@ define("router",
       var output = router._paramsForHandler(name, args, true);
       var params = output.params, toSetup = output.toSetup;
 
-      var url = router.recognizer.generate(name, params);
+      var url = router.recognizer.generate(name, params, output.queries);
       method.call(router, url);
 
       setupContexts(router, toSetup);
@@ -630,6 +642,11 @@ define("router",
       }
 
       throw new Error("Nothing handled the event '" + name + "'.");
+    }
+
+    function RouteQuery(handler, query) {
+      this.handler = handler;
+      this.query = query;
     }
 
     function setContext(handler, context) {

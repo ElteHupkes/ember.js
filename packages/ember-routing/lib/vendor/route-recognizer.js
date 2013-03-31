@@ -29,9 +29,9 @@ define("route-recognizer",
 
     function StaticSegment(string) { this.string = string; }
     StaticSegment.prototype = {
-      regex: function(query) {
+      regex: function() {
         var r = this.string.replace(escapeRegex, '\\$1');
-        return query ? r + queryRegex : r;
+        return this.query ? r + queryRegex : r;
       },
 
       generate: function() {
@@ -39,10 +39,23 @@ define("route-recognizer",
       }
     };
 
+    function EpsilonSegment() {}
+    EpsilonSegment.prototype = {
+      // Currently only used for empty routes, to conveniently
+      // apply a query regex to the last handler.
+      regex: function() {
+        return queryRegex;
+      },
+
+      generate: function() {
+        return '';
+      }
+    };
+
     function DynamicSegment(name) { this.name = name; }
     DynamicSegment.prototype = {
-      regex: function(query) {
-        return query ? "([^/;]+)" + queryRegex : "([^/]+)";
+      regex: function() {
+        return this.query ? "([^/;]+)" + queryRegex : "([^/]+)";
       },
 
       generate: function(params) {
@@ -52,8 +65,8 @@ define("route-recognizer",
 
     function StarSegment(name) { this.name = name; }
     StarSegment.prototype = {
-      regex: function(query) {
-        return query ? "([^;]+)" + queryRegex : "(.+)";
+      regex: function() {
+        return this.query ? "([^;]+)" + queryRegex : "(.+)";
       },
 
       generate: function(params) {
@@ -212,10 +225,13 @@ define("route-recognizer",
       var str = [], r = function(str) {
         // Doubly encode separators (setting them won't always automatically URL-encode)
         return str.replace(';', '%253B').replace('=', '%253D');
-      };
+      }, pair;
       for (var k in query) {
-        str.push();
-        str.push(r(k) + "=" + r(query[k]));
+        pair = r(k);
+        if (query[k]) {
+          pair += '=' + r(query[k] + '');
+        }
+        str.push(pair);
       }
       return str.join(';');
     }
@@ -265,30 +281,39 @@ define("route-recognizer",
         for (var i=0, l=routes.length; i<l; i++) {
           var route = routes[i], names = [];
 
-          var segments = parse(route.path, names, types),
-              hasQuery = !!segments.length;
+          var segments = parse(route.path, names, types);
 
           allSegments = allSegments.concat(segments);
 
           for (var j=0, m=segments.length; j<m; j++) {
             var segment = segments[j],
-                lastSegment = ((j+1) == m),
-                // Allow a query string on every handler's last segment
-                segmentRegex = segment.regex(lastSegment);
+                isLastSegment = ((j+1) == m),
+                segmentRegex;
 
             isEmpty = false;
+
+            // Allow a query string on every handler's last segment
+            if (isLastSegment) {
+              // Set the name of the handler for which this segment receives a query string
+              segment.query = route.handler;
+            }
+
+            segmentRegex = segment.regex();
             regex += '/'+segmentRegex;
             currentState = currentState.put(segmentRegex);
           }
 
-          handlers.push({ handler: route.handler, names: names, hasQuery: hasQuery });
+          handlers.push({ handler: route.handler, names: names });
         }
 
         if (isEmpty) {
           currentState = currentState.put('');
-          // Add a query string to the leaf handler
-          handlers[handlers.length - 1].hasQuery = true;
-          regex += "/"+queryRegex;
+          // Add a query string to the leaf handler of an empty route
+          var e = new EpsilonSegment(),
+              lastHandler = handlers[handlers.length - 1];
+          e.query = lastHandler.handler;
+          regex += "/"+ e.regex();
+          allSegments.push(e);
         }
 
         currentState.handlers = handlers;
@@ -318,8 +343,8 @@ define("route-recognizer",
         return !!this.names[name];
       },
 
-      generate: function(name, params) {
-        var route = this.names[name], output = "";
+      generate: function(name, params, queries) {
+        var route = this.names[name], output = "", queryString;
         if (!route) { throw new Error("There is no route named " + name); }
 
         var segments = route.segments;
@@ -329,6 +354,11 @@ define("route-recognizer",
 
           output += "/";
           output += segment.generate(params);
+
+          if (segment.query && queries[segment.query]
+                && (queryString = serializeQuery(queries[segment.query]))) {
+            output += ';'+queryString;
+          }
         }
 
         if (output.charAt(0) !== '/') { output = '/' + output; }
