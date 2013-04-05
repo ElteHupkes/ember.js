@@ -18,15 +18,29 @@ Ember.Handlebars.registerHelper('input', function(options) {
 
   var hash = options.hash,
       types = options.hashTypes,
-      inputType = hash.type;
+      inputType = hash.type,
+      onEvent = hash.on;
 
   delete hash.type;
+  delete hash.on;
 
   normalizeHash(hash, types);
 
   if (inputType === 'checkbox') {
     return Ember.Handlebars.helpers.view.call(this, Ember.Checkbox, options);
   } else {
+    hash.type = inputType;
+    hash.onEvent = onEvent || 'enter';
     return Ember.Handlebars.helpers.view.call(this, Ember.TextField, options);
   }
+});
+
+Ember.Handlebars.registerHelper('textarea', function(options) {
+  Ember.assert('You can only pass attributes to the `input` helper, not arguments', arguments.length < 2);
+
+  var hash = options.hash,
+      types = options.hashTypes;
+
+  normalizeHash(hash, types);
+  return Ember.Handlebars.helpers.view.call(this, Ember.TextArea, options);
 });
