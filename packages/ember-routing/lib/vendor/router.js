@@ -68,14 +68,16 @@ define("router",
         @return {Array} an Array of `[handler, parameter]` tuples
       */
       handleURL: function(url) {
-        var results = this.recognizer.recognize(url),
-            objects = [];
+        var parts = url.split('?'),
+            url = parts[0],
+            query = deserializeQueryString(parts[1] || ''),
+            results = this.recognizer.recognize(url);
 
         if (!results) {
           throw new Error("No route matched the URL '" + url + "'");
         }
 
-        collectObjects(this, results, 0, []);
+        collectObjects(this, results, 0, [], query);
       },
 
       /**
@@ -162,6 +164,10 @@ define("router",
       _paramsForHandler: function(handlerName, objects, doUpdate) {
         var handlers = this.recognizer.handlersFor(handlerName),
             params = {},
+            handlerQuery = {},
+            fullQuery = {},
+            query = {},
+            removedParams = [],
             toSetup = [],
             startIdx = handlers.length,
             objectsToMatch = objects.length,
@@ -185,6 +191,7 @@ define("router",
           handler = this.getHandler(handlerObj.handler);
           names = handlerObj.names;
           objectChanged = false;
+          handlerQuery = handler.activeQuery;
 
           // If it's a dynamic segment
           if (names.length) {
@@ -201,13 +208,21 @@ define("router",
             if (handler.serialize) {
               merge(params, handler.serialize(object, names));
             }
+
+            // Serialize query params from object
+            if (handler.serializeQuery) {
+              handlerQuery = handler.serializeQuery(object);
+            }
           // If it's not a dynamic segment and we're updating
           } else if (doUpdate) {
             // If we've passed the match point we need to deserialize again
             // or if we never had a context
+            if (handler.queryAffectsContext && handler.queryAffectsContext(query, removedParams)) {
+              handlerQuery = handler.deserializeQuery(query);
+            }
             if (i > startIdx || !handler.hasOwnProperty('context')) {
               if (handler.deserialize) {
-                object = handler.deserialize({});
+                object = handler.deserialize({}, handlerQuery);
                 objectChanged = true;
               }
             // Otherwise use existing context
@@ -365,7 +380,7 @@ define("router",
       resolved. It will use the resolved value as the context of
       `HandlerInfo`.
     */
-    function collectObjects(router, results, index, objects) {
+    function collectObjects(router, results, index, objects, query) {
       if (results.length === index) {
         loaded(router);
         setupContexts(router, objects);
@@ -374,7 +389,10 @@ define("router",
 
       var result = results[index];
       var handler = router.getHandler(result.handler);
-      var object = handler.deserialize && handler.deserialize(result.params);
+
+      // Create a query object for this handler
+      var handlerQuery = handler.deserializeQuery || handler.deserializeQuery(query);
+      var object = handler.deserialize && handler.deserialize(result.params, handlerQuery);
 
       if (object && typeof object.then === 'function') {
         loading(router);
@@ -615,5 +633,25 @@ define("router",
       handler.context = context;
       if (handler.contextDidChange) { handler.contextDidChange(); }
     }
+
+    /**
+     * Deserializes a query string into a query
+     * object.
+     * @param {String} str
+     * @returns {Object}
+     */
+    function deserializeQueryString(str) {
+      return Ember.$.deparam(str);
+    }
+
+    /**
+     * Serializes a query object into a query string
+     * @param {Object} obj
+     * @returns {String}
+     */
+    function serializeQuery(obj) {
+      return Ember.$.param(obj);
+    }
+
     return Router;
   });

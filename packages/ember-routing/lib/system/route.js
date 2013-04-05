@@ -4,7 +4,9 @@
 */
 
 var get = Ember.get, set = Ember.set,
-    classify = Ember.String.classify;
+    classify = Ember.String.classify,
+    forEach = Ember.ArrayPolyfills.forEach,
+    intersection = Ember.EnumerableUtils.intersection;
 
 /**
   The `Ember.Route` class is used to define individual routes. Refer to
@@ -69,6 +71,11 @@ Ember.Route = Ember.Object.extend({
     @method activate
   */
   activate: Ember.K,
+
+  /**
+   * The query parameters that affect this route's model.
+   */
+  observesParameters: null,
 
   /**
     Transition into another route. Optionally supply a model for the
@@ -162,9 +169,69 @@ Ember.Route = Ember.Object.extend({
 
     @method deserialize
   */
-  deserialize: function(params) {
+  deserialize: function(params, query) {
     var model = this.model(params);
+    this.currentQuery = query;
     return this.currentModel = model;
+  },
+
+  /**
+   * Deserialize a query object to only select the parameters
+   * that this route handler requires. By default, this uses
+   * the route's "observesParameters" array to select
+   * keys from the query object.
+   * @param {Object} query
+   * @return {Object}
+   */
+  deserializeQuery: function(query) {
+    var observes = this.get('observesParameters') || [],
+        obj;
+
+    if (observes === true) {
+      obj = query;
+    } else {
+      obj = {};
+      forEach.apply(observes, function(k) {
+        if (query.hasOwnProperty(k)) {
+          obj[k] = query[k];
+        }
+      });
+    }
+    return obj;
+  },
+
+  /**
+   * Creates the query object for this handler given a context.
+   * There is no magic way of determining how this should go,
+   * so an empty object is returned by default.
+   * @param context
+   * @return {Object}
+   */
+  serializeQuery: function(context) {
+    return {};
+  },
+
+  /**
+   * Returns true if the given query object affects this model's
+   * context. This is used to check if this model should be deserialized
+   * due to a change in the query string.
+   * @param {Object} query
+   * @param {Array} removed An array
+   */
+  queryAffectsContext: function(query, removed) {
+    var observes = this.get('observesParameters'),
+        current = this.currentQuery || {},
+        affects = false;
+
+    forEach.apply(observes, function(k) {
+      if (query.hasOwnProperty(k) && query[k] !== current[k]) {
+        affects = true;
+        return false; // break
+      }
+    });
+
+    var keyWasRemoved = !!intersection(removed, Ember.keys(current));
+    return affects || keyWasRemoved;
   },
 
   /**
