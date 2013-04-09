@@ -11,21 +11,11 @@ define("route-recognizer",
     var queryRegex = '(?:;([^/]*))?';
 
     // A Segment represents a segment in the original route description.
-    // Each Segment type provides an `eachChar` and `regex` method.
-    //
-    // The `eachChar` method invokes the callback with one or more character
-    // specifications. A character specification consumes one or more input
-    // characters.
     //
     // The `regex` method returns a regex fragment for the segment. If the
     // segment is a dynamic of star segment, the regex fragment also includes
-    // a capture.
-    //
-    // A character specification contains:
-    //
-    // * `validChars`: a String with a list of all valid characters, or
-    // * `invalidChars`: a String with a list of all invalid characters
-    // * `repeat`: true if the character specification can repeat
+    // a capture. If the segment has a "query" property, an additional
+    // capture is added to capture the query string.
 
     function StaticSegment(string) { this.string = string; }
     StaticSegment.prototype = {
